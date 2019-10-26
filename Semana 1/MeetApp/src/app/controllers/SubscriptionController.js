@@ -1,5 +1,7 @@
-import { isBefore, startOfDay, addHours } from 'date-fns';
+import { isBefore, startOfDay, addHours, format } from 'date-fns';
+import pt from 'date-fns/locale/pt';
 import { Op } from 'sequelize';
+import Mail from '../../lib/Mail';
 import Subscription from '../models/Subscription';
 import User from '../models/User';
 import Meetup from '../models/Meetup';
@@ -10,7 +12,8 @@ class SubscriptionController {
     async store(req, res) {
         const meetup_id = req.params.id;
         const meetupExists = await Meetup.findOne({
-            where: { id: meetup_id }
+            where: { id: meetup_id },
+            include: [{ model: User, attributes: ['name', 'email'] }]
         });
 
         if (!meetupExists)
@@ -18,8 +21,14 @@ class SubscriptionController {
                 .status(401)
                 .json({ error: 'This meetup doesnt exists ' });
 
-        const { user_id: admin_id, date } = meetupExists;
-
+        const {
+            user_id: admin_id,
+            date,
+            title,
+            location,
+            User: admin
+        } = meetupExists;
+        const { name: admin_name, email: admin_email } = admin;
         const userAdmin = admin_id === req.userId;
 
         if (userAdmin)
@@ -49,6 +58,7 @@ class SubscriptionController {
                 { model: User, attributes: ['id', 'name'] },
                 {
                     model: Meetup,
+                    as: 'meetupid',
                     attributes: ['id', 'date', 'title'],
                     where: {
                         date: {
@@ -68,11 +78,31 @@ class SubscriptionController {
             meetup_id
         });
 
+        const { name } = await User.findByPk(req.userId);
+        await Mail.sendMail({
+            to: `${admin_name} <${admin_email}>`,
+            subject: `${name} irá ao seu evento!`,
+            template: 'subscription',
+            context: {
+                admin_name,
+                name,
+                date: format(
+                    date,
+                    "'dia' dd 'de' MMMM 'de' yyyy', às' H:mm'h' ",
+                    {
+                        locale: pt
+                    }
+                ),
+                location,
+                title
+            }
+        });
         return res.status(200).json({
             id,
             user_id,
             meetup_id,
-            date
+            title,
+            admin_name
         });
     }
 
@@ -82,6 +112,7 @@ class SubscriptionController {
                 id: req.userId
             },
             attributes: ['id', 'name', 'email'],
+
             include: [
                 {
                     model: Meetup,
@@ -96,9 +127,33 @@ class SubscriptionController {
                         }
                     }
                 }
-            ]
+            ],
+            order: [[{ model: Meetup, as: 'subscription' }, 'date', 'asc']]
         });
-        return res.status(200).json(users);
+
+        // const subscription = await Subscription.findAll({
+        //     where: {
+        //         user_id: req.userId
+        //     },
+        //     attributes: ['user_id'],
+        //     include: [
+        //         {
+        //             model: Meetup,
+        //             as: 'meetupid',
+        //             attributes: ['id', 'date', 'title', 'user_id'],
+        //             where: {
+        //                 date: {
+        //                     [Op.between]: [
+        //                         startOfDay(new Date()),
+        //                         endOftheWorld
+        //                     ]
+        //                 }
+        //             }
+        //         }
+        //     ],
+        //     order: [[{ model: Meetup, as: 'meetupid' }, 'date', 'asc']]
+        // });
+        return res.status(200).send(users);
     }
 }
 

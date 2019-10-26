@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import * as Yup from 'yup';
 
-import Student from '../models/Student';
+import User from '../models/User';
 import authConfig from '../../config/auth';
 
 class SessionController {
@@ -13,21 +13,22 @@ class SessionController {
             password: Yup.string().required()
         });
 
-        if (!(await schema.isValid(req.body)))
+        if (!(await schema.isValid(req.body))) {
             return res.status(400).json({ error: 'Validation failed' });
+        }
 
         const { email, password } = req.body;
 
-        const studentExist = await Student.findOne({ where: { email } });
-        if (!studentExist) {
+        const userExist = await User.findOne({ where: { email } });
+        if (!userExist) {
             return res.status(401).json({ error: 'User does not exist' });
         }
 
-        if (!(await studentExist.checkPassword(password))) {
+        if (!(await userExist.checkPassword(password))) {
             return res.status(400).json({ error: 'Wrong password' });
         }
 
-        const { id, name } = studentExist;
+        const { id, name } = userExist;
 
         return res.status(200).json({
             user: {

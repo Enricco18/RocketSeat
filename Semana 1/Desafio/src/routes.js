@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import StudentController from './app/controllers/StudentController';
+import UserController from './app/controllers/UserController';
 import SessionController from './app/controllers/SessionController';
 import authMiddleware from './app/middlewares/auth';
 
@@ -10,6 +11,7 @@ router.get('/', (req, res) => {
     res.status(200).send({ ok: 'td certo' });
 });
 
+router.post('/user', UserController.store);
 router.post('/sessions', SessionController.store);
 
 router.use(authMiddleware);
