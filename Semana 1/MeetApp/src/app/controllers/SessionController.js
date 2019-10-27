@@ -29,7 +29,6 @@ class SessionController {
         }
 
         const { id, name } = userExist;
-
         return res.status(200).json({
             user: {
                 id,
